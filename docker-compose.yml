@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: kusrchub
+    environment:
+      POSTGRES_DB: kusrchub
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+    volumes:    
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
