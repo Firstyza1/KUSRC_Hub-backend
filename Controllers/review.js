@@ -105,35 +105,35 @@ exports.deleteSubject = async (req, res) => {
   }
 };
 
-exports.getSubjectById = async (req, res) => {
-  const { subject_id } = req.params; // รับ subject_id จาก URL
+// exports.getSubjectById = async (req, res) => {
+//   const { subject_id } = req.params; // รับ subject_id จาก URL
 
-  try {
-    // ✅ ดึงข้อมูลเฉพาะรายวิชาที่ต้องการ
-    const query = `
-          SELECT t1.subject_id, t1.subject_thai, t1.subject_eng, t1.credit, 
-                 t2.category_name, t1.created_at, t1.updated_at 
-          FROM subject t1
-          JOIN category t2 ON t1.category_id = t2.category_id
-          WHERE t1.subject_id = $1;
-      `;
-    const result = await db.query(query, [subject_id]);
+//   try {
+//     // ✅ ดึงข้อมูลเฉพาะรายวิชาที่ต้องการ
+//     const query = `
+//           SELECT t1.subject_id, t1.subject_thai, t1.subject_eng, t1.credit, 
+//                  t2.category_name, t1.created_at, t1.updated_at 
+//           FROM subject t1
+//           JOIN category t2 ON t1.category_id = t2.category_id
+//           WHERE t1.subject_id = $1;
+//       `;
+//     const result = await db.query(query, [subject_id]);
 
-    // ✅ ตรวจสอบว่าพบข้อมูลหรือไม่
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "ไม่พบรายวิชานี้" });
-    }
+//     // ✅ ตรวจสอบว่าพบข้อมูลหรือไม่
+//     if (result.rowCount === 0) {
+//       return res.status(404).json({ error: "ไม่พบรายวิชานี้" });
+//     }
 
-    // ✅ ส่งข้อมูลกลับ
-    res.status(200).json({ subject: result.rows[0] });
-  } catch (error) {
-    console.error("Error retrieving subject:", error);
-    res.status(500).json({
-      error: "เกิดข้อผิดพลาดในการดึงข้อมูลรายวิชา",
-      details: error.message,
-    });
-  }
-};
+//     // ✅ ส่งข้อมูลกลับ
+//     res.status(200).json({ subject: result.rows[0] });
+//   } catch (error) {
+//     console.error("Error retrieving subject:", error);
+//     res.status(500).json({
+//       error: "เกิดข้อผิดพลาดในการดึงข้อมูลรายวิชา",
+//       details: error.message,
+//     });
+//   }
+// };
 
 exports.updateSubject = async (req, res) => {
   const { subject_id } = req.params; // รับ subject_id จาก URL
@@ -239,6 +239,558 @@ exports.deleteReview = async (req, res) => {
     console.error(error.message);
     res.status(500).json({
       error: `An error occurred while processing your request: ${error.message},`
+    });
+  }
+};
+
+
+//เพิ่มของทีน
+exports.getSubjectById = async (req, res) => {
+  try {
+    const { subject_id } = req.params;
+
+    if (!subject_id) {
+      console.log("Error: subject_id is required.");
+      return res.status(400).json({ message: "subject_id is required." });
+    }
+
+    const result = await db.query(
+      `SELECT 
+        t1.subject_id,
+        t1.subject_thai,
+        t1.subject_eng,
+        t1.credit,
+        t2.category_thai,
+        ROUND(AVG((COALESCE(t3.score_homework, 0) / 4.0) * 100), 0) AS percent_homework,
+        ROUND(AVG((COALESCE(t3.score_content, 0) / 4.0) * 100), 0) AS percent_content,
+        ROUND(AVG((COALESCE(t3.score_teach, 0) / 4.0) * 100), 0) AS percent_teach
+        FROM 
+            subject t1
+        LEFT JOIN category t2 ON t1.category_id = t2.category_id
+        LEFT JOIN review t3 ON t1.subject_id = t3.subject_id
+        WHERE 
+            t1.subject_id = $1
+        GROUP BY  
+            t1.subject_id,
+            t1.subject_thai,
+            t1.subject_eng,
+            t1.credit,
+            t2.category_thai;`,
+      [subject_id]
+    );
+
+    if (result.rows.length > 0) {
+      res.status(200).json(result.rows[0]);
+    } else {
+      res.status(404).json({ message: "No data found." });
+    }
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({
+      error: "An error occurred while retrieving subjects",
+      error: error.message,
+    });
+  }
+};
+
+exports.createReview = async (req, res) => {
+  let pdf_path = null;
+  try {
+    const {
+      review_id,
+      user_id,
+      subject_id,
+      review_desc,
+      grade,
+      score_homework,
+      score_content,
+      score_teach,
+      semester,
+      academic_year,
+    } = req.body;
+
+    if (req.file) {
+      if (req.file.mimetype !== "application/pdf") {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ message: "Only PDF files are allowed" });
+      }
+
+      if (req.file.size > 5 * 1024 * 1024) {
+        fs.unlinkSync(req.file.path);
+        return res
+          .status(400)
+          .json({ message: "File size must not exceed 5MB" });
+      }
+
+      try {
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: "SummaryFile",
+          upload_preset: "SummaryFile",
+        });
+        fs.unlinkSync(req.file.path);
+        pdf_path = result.secure_url;
+      } catch (error) {
+        fs.unlinkSync(req.file.path);
+        return res
+          .status(500)
+          .json({ message: "File upload error", error: error.message });
+      }
+    }
+
+    if (
+      !user_id ||
+      !subject_id ||
+      !review_desc ||
+      // !grade ||
+      !score_homework ||
+      !score_content ||
+      !score_teach ||
+      !semester ||
+      !academic_year
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Please fill out all the required fields." });
+    }
+
+    const checkUserID = await db.query(
+      "SELECT user_id FROM users WHERE user_id = $1",
+      [user_id]
+    );
+    if (checkUserID.rows.length === 0) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    const currentTime = new Date();
+    let reviewQuery;
+    let reviewValues;
+
+    if (review_id) {
+      reviewQuery = `
+        UPDATE review
+        SET review_desc = $1, 
+            score_homework = $2, 
+            score_content = $3,
+            score_teach = $4,
+            grade = $5,
+            semester = $6,
+            academic_year = $7,
+            updated_at = $8,
+            pdf_path = COALESCE($9, pdf_path)
+        WHERE review_id = $10
+        RETURNING *`;
+      reviewValues = [
+        review_desc,
+        score_homework,
+        score_content,
+        score_teach,
+        grade,
+        semester,
+        academic_year,
+        currentTime,
+        pdf_path,
+        review_id,
+      ];
+    } else {
+      reviewQuery = `
+        INSERT INTO review(user_id, subject_id, review_desc, score_homework, score_content, score_teach, grade, semester, academic_year, pdf_path, created_at)
+        VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *`;
+      reviewValues = [
+        user_id,
+        subject_id,
+        review_desc,
+        score_homework,
+        score_content,
+        score_teach,
+        grade,
+        semester,
+        academic_year,
+        pdf_path,
+        currentTime,
+      ];
+    }
+
+    const review = await db.query(reviewQuery, reviewValues);
+
+    if (review.rowCount === 0) {
+      return res.status(400).json({ message: "Failed to save review" });
+    }
+
+    const statusCode = review_id ? 200 : 201;
+    const action = review_id ? "updated" : "inserted";
+    res.status(statusCode).json({
+      message: `Review ${action} successfully`,
+      review: review.rows[0],
+    });
+  } catch (error) {
+    console.error("Error in review:", error);
+    res.status(500).json({
+      message: "An error occurred while submitting the review",
+      error: error.message,
+    });
+  }
+};
+
+exports.getReview = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      semester,
+      academic_year,
+      includePdf,
+      user_id = null,
+    } = req.query;
+    const offset = (page - 1) * limit;
+    const { subject_id } = req.params;
+
+    if (!subject_id) {
+      console.log("Error: subject_id is required.");
+      return res.status(400).json({ message: "subject_id is required." });
+    }
+
+    let query = `
+      SELECT 
+        t1.review_id,
+        t1.user_id,
+        t2.user_profile,
+        t2.username,
+        t1.subject_id,
+        t1.review_desc,
+        t1.grade,
+        t1.semester,
+        t1.academic_year,
+        t1.pdf_path,
+        COUNT(DISTINCT CASE WHEN t3.reaction_type = 'like' THEN t3.reaction_id END) AS like_count,
+        COUNT(DISTINCT CASE WHEN t3.reaction_type = 'dislike' THEN t3.reaction_id END) AS dislike_count,
+        t1.created_at,
+        t1.updated_at,
+        ROUND(((t1.score_homework + t1.score_content + t1.score_teach) / 12.0) * 100, 0) AS overall_percentage,
+        MAX(CASE WHEN t4.user_id = $2
+        AND t4.reaction_type = 'like' THEN 1 ELSE 0 END) AS user_has_liked,
+        MAX(CASE WHEN t4.user_id = $2
+        AND t4.reaction_type = 'dislike' THEN 1 ELSE 0 END) AS user_has_disliked
+      FROM review t1
+      INNER JOIN users t2 ON t1.user_id = t2.user_id
+      LEFT JOIN review_reaction t3 ON t1.review_id = t3.review_id
+      LEFT JOIN review_reaction t4 ON t1.review_id = t4.review_id AND t4.user_id = $2
+      WHERE t1.subject_id = $1
+    `;
+
+    const queryParams = [subject_id, user_id];
+
+    if (semester) {
+      query += ` AND t1.semester = $${queryParams.length + 1}`;
+      queryParams.push(semester);
+    }
+
+    if (academic_year) {
+      query += ` AND t1.academic_year = $${queryParams.length + 1}`;
+      queryParams.push(academic_year);
+    }
+
+    // เพิ่มเงื่อนไขสำหรับการกรอง pdf_path ถ้า includePdf มีค่าเป็น "true"
+    if (includePdf === "true") {
+      query += ` AND t1.pdf_path IS NOT NULL AND t1.pdf_path != ''`;
+    }
+
+    query += ` GROUP BY 
+        t1.review_id,
+        t1.user_id,
+        t2.user_profile,
+        t2.username,
+        t1.subject_id,
+        t1.review_desc,
+        t1.grade,
+        t1.semester,
+        t1.academic_year,
+        t1.pdf_path,
+        t1.created_at,
+        t1.updated_at,
+        t1.score_homework,
+        t1.score_content,
+        t1.score_teach
+      LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    queryParams.push(limit, offset);
+
+    const result = await db.query(query, queryParams);
+
+    if (result.rows.length > 0) {
+      res.status(200).json(result.rows);
+    } else {
+      res.status(200).json([]);
+      // res.status(404).json({ message: "No reviews found for this subject." });
+    }
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({
+      message: "An error occurred while retrieving reviews.",
+      error: error.message,
+    });
+  }
+};
+
+exports.reviewReactions = async (req, res) => {
+  try {
+    const { user_id, review_id, type } = req.body;
+    if (!user_id || !review_id || !type) {
+      return res
+        .status(400)
+        .json({ message: "Please fill out the information completely." });
+    }
+
+    const checkUserID = await db.query(
+      "SELECT user_id FROM users WHERE user_id = $1",
+      [user_id]
+    );
+    if (checkUserID.rows.length === 0) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    const checkReview = await db.query(
+      "SELECT review FROM review WHERE review_id = $1",
+      [review_id]
+    );
+    if (checkReview.rows.length === 0) {
+      return res.status(400).json({ message: "Review not found" });
+    }
+
+    const checkReviewUser = await db.query(
+      "SELECT * FROM review_reaction WHERE user_id = $1 AND review_id = $2",
+      [user_id, review_id]
+    );
+
+    if (checkReviewUser.rows.length > 0) {
+      const existingReaction = checkReviewUser.rows[0];
+
+      if (existingReaction.reaction_type === type) {
+        await db.query(
+          "DELETE FROM review_reaction WHERE user_id = $1 AND review_id = $2",
+          [user_id, review_id]
+        );
+
+        return res.status(200).json({
+          message: "Reaction removed successfully",
+        });
+      } else {
+        const currentTime = new Date();
+        const updateResult = await db.query(
+          "UPDATE review_reaction SET reaction_type = $1, updated_at = $2 WHERE user_id = $3 AND review_id = $4 RETURNING *",
+          [type, currentTime, user_id, review_id]
+        );
+
+        return res.status(200).json({
+          message: "Reaction updated successfully",
+          updatedReaction: updateResult.rows[0],
+        });
+      }
+    }
+
+    const insertReaction = await db.query(
+      "INSERT INTO review_reaction (review_id, user_id, reaction_type) VALUES ($1, $2, $3) RETURNING *",
+      [review_id, user_id, type]
+    );
+    res.status(201).json({
+      message: `Review ${type} successfully`,
+      review: insertReaction.rows[0],
+    });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({
+      error: `An error occurred while processing your request: ${error.message}`,
+    });
+  }
+};
+
+exports.getReaction = async (req, res) => {
+  try {
+    const { review_id } = req.params;
+    if (!review_id) {
+      console.log("Error: review_id is required.");
+      return res.status(400).json({ message: "review_id is required." });
+    }
+
+    const result = await db.query(
+      `SELECT 
+          t1.review_id,
+          COUNT(CASE WHEN t2.reaction_type = 'like' THEN 1 END) AS like_count,
+          COUNT(CASE WHEN t2.reaction_type = 'dislike' THEN 1 END) AS dislike_count
+      FROM 
+          review t1
+      LEFT JOIN 
+          review_reaction t2 ON t1.review_id = t2.review_id
+      where t1.review_id = $1
+      GROUP BY 
+          t1.review_id;`,
+      [review_id]
+    );
+
+    if (result.rows.length > 0) {
+      res.status(200).json(result.rows);
+    } else {
+      res.status(404).json({ message: "No data found." });
+    }
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({
+      error: "An error occurred while retrieving review ",
+      error: error.message,
+    });
+  }
+};
+
+// exports.postPDF = async (req, res) => {
+//   if (!req.file) {
+//     return res.status(400).json({ message: "ไม่พบไฟล์ที่อัพโหลด" });
+//   }
+
+//   if (req.file.mimetype !== "application/pdf") {
+//     fs.unlinkSync(req.file.path);
+//     return res.status(400).json({ message: "อนุญาตให้ใช้ไฟล์ PDF เท่านั้น" });
+//   }
+
+//   if (req.file.size > 5 * 1024 * 1024) {
+//     fs.unlinkSync(req.file.path);
+//     return res.status(400).json({ message: "ขนาดไฟล์ต้องไม่เกิน 5MB" });
+//   }
+
+//   try {
+//     const name = req.body.name || "";
+//     const surname = req.body.surname || "";
+
+//     // ใช้ชื่อและนามสกุลเพื่อสร้างชื่อไฟล์ใหม่
+//     const fileName =
+//       `${name}_${surname}.pdf` || path.basename(req.file.originalname);
+
+//     const newFilePath = path.join(path.dirname(req.file.path), fileName);
+
+//     fs.renameSync(req.file.path, newFilePath);
+
+//     const result = await cloudinary.uploader.upload(newFilePath, {
+//       folder: "SummaryFile",
+//       upload_preset: "SummaryFile",
+//       // public_id: fileName.replace(/\s+/g, "_"),
+//     });
+
+//     fs.unlinkSync(newFilePath);
+
+//     return res.status(200).json({
+//       message: "ไฟล์อัพโหลดสำเร็จ",
+//       url: result.secure_url,
+//     });
+//   } catch (error) {
+//     fs.unlinkSync(req.file.path);
+//     return res.status(500).json({
+//       message: "เกิดข้อผิดพลาดในการอัพโหลดไฟล์",
+//       error: error.message,
+//     });
+//   }
+// };
+
+exports.getReviewByUser = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    if (!user_id) {
+      console.log("Error: subject_id is required.");
+      return res.status(400).json({ message: "user_id is required." });
+    }
+    const checkUserID = await db.query(
+      "SELECT user_id FROM users WHERE user_id = $1",
+      [user_id]
+    );
+    if (checkUserID.rows.length === 0) {
+      return res.status(400).json({ message: "User not found" });
+    }
+    const result = await db.query(
+      `SELECT review_id, reaction_type FROM review_reaction WHERE user_id = $1`,
+      [user_id]
+    );
+    if (result.rows.length > 0) {
+      res.status(200).json(result.rows);
+    } else {
+      res.status(404).json({ message: "No data found." });
+    }
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({
+      error: "An error occurred while retrieving review ",
+      error: error.message,
+    });
+  }
+};
+
+exports.getReviewById = async (req, res) => {
+  try {
+    const { review_id } = req.params;
+    if (!review_id) {
+      console.log("Error: review_id is required.");
+      return res.status(400).json({ message: "review_id is required." });
+    }
+
+    let query = `
+      select * from review where review_id = $1
+    `;
+
+    const queryParams = [review_id];
+
+    const result = await db.query(query, queryParams);
+
+    if (result.rows.length > 0) {
+      res.status(200).json(result.rows);
+    } else {
+      res.status(404).json({ message: "Data not found." });
+    }
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({
+      message: "An error occurred while retrieving reviews.",
+      error: error.message,
+    });
+  }
+};
+
+exports.reportReview = async (req, res) => {
+  try {
+    const { user_id, report_desc } = req.body;
+    const { review_id } = req.params;
+
+    if (!user_id || !report_desc || !review_id) {
+      return res
+        .status(400)
+        .json({ message: "Please fill out all the required fields." });
+    }
+
+    const checkUserID = await db.query(
+      "SELECT user_id FROM users WHERE user_id = $1",
+      [user_id]
+    );
+    if (checkUserID.rows.length === 0) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    const checkReview = await db.query(
+      "SELECT review_id FROM review WHERE review_id = $1",
+      [review_id]
+    );
+    if (checkReview.rows.length === 0) {
+      return res.status(400).json({ message: "Review not found" });
+    }
+
+    const Report = await db.query(
+      `INSERT INTO report_review (user_id,review_id, report_desc) VALUES($1, $2,$3) RETURNING *`,
+      [user_id, review_id, report_desc]
+    );
+
+    res.status(200).json({
+      message: `Report review successfully`,
+      post: Report.rows[0],
+    });
+  } catch (error) {
+    console.error("Error in Report:", error);
+    res.status(500).json({
+      message: "An error occurred while submitting the post",
+      error: error.message,
     });
   }
 };
