@@ -16,7 +16,7 @@ const {
   deleteComment,
 } = require("../Controllers/community");
 
-router.post("/createPost/:user_id", createPost);
+router.post("/createPost", createPost);
 router.delete("/deletePost/:post_id", deletePost); //อาจจะต่างกับทีน
 router.put("/updatePost/:post_id", updatePost);
 router.get("/getPost", getPost);
