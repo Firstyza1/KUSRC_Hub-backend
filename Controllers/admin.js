@@ -474,3 +474,47 @@ exports.getAllStats = async (req, res) => {
       });
   }
 };
+
+exports.getAllPost = async (req, res) => {
+  try {
+    let query = 
+      `SELECT 
+        t1.post_id, 
+        t1.user_id, 
+        t2.user_profile, 
+        t2.username, 
+        t1.post_desc, 
+        COUNT(DISTINCT CASE WHEN t3.reaction_type = 'like' THEN t3.reaction_id END) AS like_count,
+        COUNT(DISTINCT CASE WHEN t3.reaction_type = 'dislike' THEN t3.reaction_id END) AS dislike_count,
+        COUNT(DISTINCT t4.comment_id) AS comment_count,
+        t1.created_at,
+        t1.updated_at
+      FROM post t1
+      INNER JOIN users t2 ON t1.user_id = t2.user_id
+      LEFT JOIN post_reaction t3 ON t1.post_id = t3.post_id
+      LEFT JOIN comment t4 ON t1.post_id = t4.post_id
+      GROUP BY 
+        t1.post_id, 
+        t1.user_id, 
+        t2.user_profile, 
+        t2.username, 
+        t1.post_desc, 
+        t1.created_at, 
+        t1.updated_at;
+    `;
+
+    const result = await db.query(query);
+
+    if (result.rows.length > 0) {
+      res.status(200).json(result.rows);
+    } else {
+      res.status(200).json([]);
+    }
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({
+      error: "An error occurred while retrieving post",
+      message: error.message,
+    });
+  }
+};

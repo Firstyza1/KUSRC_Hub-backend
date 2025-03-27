@@ -143,27 +143,60 @@ exports.updatePost = async (req, res) => {
 };
 
 exports.getPost = async (req, res) => {
-    try {
-        // ✅ ดึงข้อมูลโพสต์ทั้งหมด พร้อมข้อมูลผู้ใช้ที่โพสต์
-        const query = `
-             SELECT p.post_id, p.post_desc, p.created_at, p.updated_at,
-                   u.user_id, u.username, u.user_profile,
-                   COALESCE(COUNT(c.comment_id), 0) AS comment_count
-            FROM post p
-            JOIN users u ON p.user_id = u.user_id
-            LEFT JOIN comment c ON p.post_id = c.post_id
-            GROUP BY p.post_id, u.user_id
-            ORDER BY p.created_at DESC;
-        `;
-        const result = await db.query(query);
+  const { page = 1, limit = 10, sort = "desc", user_id = null } = req.query;
+  const offset = (page - 1) * limit;
 
-        // ✅ ส่งข้อมูลกลับในรูปแบบ JSON
-        res.status(200).json({ posts: result.rows });
-    } catch (error) {
-        console.error("เกิดข้อผิดพลาดในการดึงโพสต์:", error);
-        res.status(500).json({ error: "ไม่สามารถดึงโพสต์ได้", details: error.message });
+  try {
+    let query = 
+      `SELECT 
+        t1.post_id, 
+        t1.user_id, 
+        t2.user_profile, 
+        t2.username, 
+        t1.post_desc, 
+        COUNT(DISTINCT CASE WHEN t3.reaction_type = 'like' THEN t3.reaction_id END) AS like_count,
+        COUNT(DISTINCT CASE WHEN t3.reaction_type = 'dislike' THEN t3.reaction_id END) AS dislike_count,
+        COUNT(DISTINCT t4.comment_id) AS comment_count,
+        t1.created_at,
+        t1.updated_at,
+        MAX(CASE WHEN t5.user_id = $3 AND t5.reaction_type = 'like' THEN 1 ELSE 0 END) AS user_has_liked,
+        MAX(CASE WHEN t5.user_id = $3 AND t5.reaction_type = 'dislike' THEN 1 ELSE 0 END) AS user_has_disliked
+      FROM post t1
+      INNER JOIN users t2 ON t1.user_id = t2.user_id
+      LEFT JOIN post_reaction t3 ON t1.post_id = t3.post_id
+      LEFT JOIN comment t4 ON t1.post_id = t4.post_id
+      LEFT JOIN post_reaction t5 ON t1.post_id = t5.post_id AND t5.user_id = $3 
+      GROUP BY 
+        t1.post_id, 
+        t1.user_id, 
+        t2.user_profile, 
+        t2.username, 
+        t1.post_desc, 
+        t1.created_at, 
+        t1.updated_at
+      ORDER BY t1.created_at ${sort.toUpperCase() === "ASC" ? "ASC" : "DESC"}
+      LIMIT $1 OFFSET $2;`
+    ;
+
+    const queryParams = [limit, offset, user_id];
+
+    const result = await db.query(query, queryParams);
+
+    if (result.rows.length > 0) {
+      res.status(200).json(result.rows);
+    } else {
+      res.status(200).json([]);
+      // res.status(404).json({ message: "No data found." });
     }
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({
+      error: "An error occurred while retrieving post",
+      message: error.message,
+    });
+  }
 };
+
 
 // exports.getPostById = async (req, res) => {
 //     const { post_id } = req.params; // รับ post_id จาก URL

@@ -1,6 +1,6 @@
 const express = require("express");
 router = express.Router();
-const { auth,adminAuth,isOwnerOrAdmin } = require('../Middleware/auth')
+const { auth, adminAuth, isOwnerOrAdmin } = require("../Middleware/auth");
 const {
   getAllReviews,
   getAllReportedReview,
@@ -9,9 +9,10 @@ const {
   deleteReportedPost,
   getAllReportedComment,
   deleteReportedComment,
-  getAllStats
+  getAllStats,
+  getAllPost,
 } = require("../Controllers/admin");
-router.get("/getAllReview",auth,adminAuth,getAllReviews);
+router.get("/getAllReview", auth, adminAuth, getAllReviews);
 router.get("/getAllReportedReview", getAllReportedReview);
 router.delete("/deleteReportedReview/:report_id", deleteReportedReview);
 router.get("/getAllReportedPost", getAllReportedPost);
@@ -24,4 +25,5 @@ router.delete("/deleteReportedComment/:report_id", deleteReportedComment);
 // router.get("/getReviewGrowth", getReviewGrowth);
 // router.get("/getPostGrowth", getPostGrowth);
 router.get("/getAllStats", getAllStats);
+router.get("/getAllPost", getAllPost);
 module.exports = router;
