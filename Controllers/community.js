@@ -1,60 +1,61 @@
 const db = require("../db");
 
 exports.createPost = async (req, res) => {
-  try {
-    const { user_id, post_desc, post_id } = req.body;
+<<<<<<< HEAD
+try {
+  const { user_id, post_desc, post_id } = req.body;
 
-    if (!user_id || !post_desc) {
-      return res
-        .status(400)
-        .json({ message: "Please fill out all the required fields." });
-    }
-
-    const checkUserID = await db.query(
-      "SELECT user_id FROM users WHERE user_id = $1",
-      [user_id]
-    );
-    if (checkUserID.rows.length === 0) {
-      return res.status(400).json({ message: "User not found" });
-    }
-
-    const currentTime = new Date();
-    let postQuery;
-    let postValues;
-
-    if (post_id) {
-      const checkPost = await db.query(
-        "SELECT post_id FROM post WHERE post_id = $1",
-        [post_id]
-      );
-      if (checkPost.rows.length === 0) {
-        return res.status(404).json({ message: "Post not found." });
-      }
-      postQuery = `
-        UPDATE post
-        SET post_desc = $1, 
-            updated_at = $2
-        WHERE post_id = $3 RETURNING *`;
-      postValues = [post_desc, currentTime, post_id];
-    } else {
-      postQuery = `INSERT INTO post (user_id, post_desc,created_at) VALUES($1, $2,$3) RETURNING *`;
-      postValues = [user_id, post_desc, currentTime];
-    }
-
-    const post = await db.query(postQuery, postValues);
-    const statusCode = post_id ? 200 : 201;
-    const action = post_id ? "updated" : "inserted";
-    res.status(statusCode).json({
-      message: `Post ${action} successfully`,
-      post: post.rows[0],
-    });
-  } catch (error) {
-    console.error("Error in post:", error);
-    res.status(500).json({
-      message: "An error occurred while submitting the post",
-      error: error.message,
-    });
+  if (!user_id || !post_desc) {
+    return res
+      .status(400)
+      .json({ message: "Please fill out all the required fields." });
   }
+
+  const checkUserID = await db.query(
+    "SELECT user_id FROM users WHERE user_id = $1",
+    [user_id]
+  );
+  if (checkUserID.rows.length === 0) {
+    return res.status(400).json({ message: "User not found" });
+  }
+
+  const currentTime = new Date();
+  let postQuery;
+  let postValues;
+
+  if (post_id) {
+    const checkPost = await db.query(
+      "SELECT post_id FROM post WHERE post_id = $1",
+      [post_id]
+    );
+    if (checkPost.rows.length === 0) {
+      return res.status(404).json({ message: "Post not found." });
+    }
+    postQuery = `
+      UPDATE post
+      SET post_desc = $1, 
+          updated_at = $2
+      WHERE post_id = $3 RETURNING *`;
+    postValues = [post_desc, currentTime, post_id];
+  } else {
+    postQuery = `INSERT INTO post (user_id, post_desc,created_at) VALUES($1, $2,$3) RETURNING *`;
+    postValues = [user_id, post_desc, currentTime];
+  }
+
+  const post = await db.query(postQuery, postValues);
+  const statusCode = post_id ? 200 : 201;
+  const action = post_id ? "updated" : "inserted";
+  res.status(statusCode).json({
+    message: `Post ${action} successfully`,
+    post: post.rows[0],
+  });
+} catch (error) {
+  console.error("Error in post:", error);
+  res.status(500).json({
+    message: "An error occurred while submitting the post",
+    error: error.message,
+  });
+}
 };
 
 exports.deletePost = async (req, res) => {
@@ -223,6 +224,9 @@ exports.getPost = async (req, res) => {
     });
   }
 };
+
+
+
 // exports.getPostById = async (req, res) => {
 //     const { post_id } = req.params; // รับ post_id จาก URL
 
