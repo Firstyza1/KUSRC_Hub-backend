@@ -1,7 +1,7 @@
 const db = require("../db");
 
 exports.createPost = async (req, res) => {
-<<<<<<< HEAD
+
 try {
   const { user_id, post_desc, post_id } = req.body;
 
