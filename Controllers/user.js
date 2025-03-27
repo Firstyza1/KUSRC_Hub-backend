@@ -2,13 +2,15 @@ const db = require("../db");
 const cloudinary = require("../cloudinary");
 const fs = require("fs");
 const path = require("path");
+const { error } = require("console");
+const bcrypt = require("bcryptjs");
 exports.userProfile = async (req, res) => {
   try {
     const { user_id } = req.params; // รับ user_id จาก URL parameter
 
     // ตรวจสอบว่ามีการส่ง user_id มาหรือไม่
     if (!user_id) {
-      return res.status(400).json({ message: "User ID is required" });
+      return res.status(400).json({ message: "ต้องระบุรหัสผู้ใช้" });
     }
 
     // ดึงข้อมูลผู้ใช้จากตาราง users
@@ -29,9 +31,9 @@ exports.userProfile = async (req, res) => {
       user: result.rows[0], // คืนค่าข้อมูลผู้ใช้
     });
   } catch (error) {
-    console.error("Error retrieving user profile:", error);
+    console.error("เกิดข้อผิดพลาดในการเรียกข้อมูลโปรไฟล์ผู้ใช้:", error);
     res.status(500).json({
-      message: "An error occurred while retrieving user profile",
+      message: "เกิดข้อผิดพลาดขณะเรียกข้อมูลโปรไฟล์ผู้ใช้",
       error: error.message,
     });
   }
@@ -112,17 +114,77 @@ exports.updateUserProfile = async (req, res) => {
     if (updateResult.rowCount === 0) {
       return res
         .status(404)
-        .json({ message: "User not found or no changes made" });
+        .json({ message: "ไม่พบผู้ใช้หรือไม่มีการเปลี่ยนแปลง" });
     }
 
     res.status(200).json({
-      message: "User profile updated successfully",
+      message: "อัปเดตโปรไฟล์ผู้ใช้สำเร็จแล้ว",
       user: updateResult.rows[0],
     });
   } catch (error) {
-    console.error("Error updating user profile:", error);
+    console.error("เกิดข้อผิดพลาดในการอัปเดตโปรไฟล์ผู้ใช้:", error);
     res.status(500).json({
-      message: "An error occurred while updating user profile",
+      message: "เกิดข้อผิดพลาดขณะอัปเดตโปรไฟล์ผู้ใช้",
+      error: error.message,
+    });
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+    const { user_id } = req.params; // รับ user_id จาก URL
+
+    if(!user_id){
+      return res.status(400).json({error: "ต้องระบุรหัสผู้ใช้"})
+    }
+
+    // ตรวจสอบว่า user_id เป็นตัวเลขหรือไม่
+    const parsedUserId = parseInt(user_id, 10);
+    if (isNaN(parsedUserId)) {
+        return res.status(400).json({ error: "user_id ต้องเป็นตัวเลข" });
+    }
+
+    try {
+        // ✅ ตรวจสอบว่าผู้ใช้มีอยู่จริงหรือไม่
+        const checkQuery = "SELECT * FROM users WHERE user_id = $1;";
+        const checkResult = await db.query(checkQuery, [parsedUserId]);
+
+        if (checkResult.rowCount === 0) {
+            return res.status(404).json({ error: "ไม่พบผู้ใช้ที่ต้องการลบ" });
+        }
+
+        // ✅ ลบผู้ใช้
+        const deleteQuery = "DELETE FROM users WHERE user_id = $1 RETURNING *;";
+        const result = await db.query(deleteQuery, [parsedUserId]);
+
+        res.json({ message: "ลบผู้ใช้สำเร็จ", deletedUser: result.rows[0] });
+    } catch (err) {
+        console.error("เกิดข้อผิดพลาดในการลบผู้ใช้:", err);
+        res.status(500).json({ error: "ไม่สามารถลบผู้ใช้ได้", details: err.message });
+    }
+};
+
+exports.getAllUsers = async (req, res) => {
+  try {
+    // คิวรีดึงข้อมูลผู้ใช้ทั้งหมด
+    const query = `
+      SELECT user_id, email, username, user_profile, created_at, updated_at 
+      FROM users
+    `;
+    const result = await db.query(query);
+
+    // // ตรวจสอบว่ามีข้อมูลหรือไม่
+    // if (result.rows.length === 0) {
+    //   return res.status(404).json({ message: "No users found" });
+    // }
+
+    // ส่งข้อมูลกลับในรูปแบบ JSON
+    res.status(200).json({
+      users: result.rows, // คืนค่าข้อมูลผู้ใช้ทั้งหมด
+    });
+  } catch (error) {
+    console.error("เกิดข้อผิดพลาดในการดึงข้อมูลผู้ใช้ทั้งหมด:", error);
+    res.status(500).json({
+      message: "เกิดข้อผิดพลาดขณะดึงข้อมูลผู้ใช้",
       error: error.message,
     });
   }

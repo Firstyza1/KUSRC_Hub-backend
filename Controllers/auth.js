@@ -152,8 +152,15 @@ exports.register = async (req, res) => {
 
     // เพิ่มผู้ใช้ใหม่ลงในฐานข้อมูล
     const query =
-      "INSERT INTO users (email, username, password) VALUES ($1, $2, $3) RETURNING *";
-    const values = [email, username, hashedPassword];
+      "INSERT INTO users (email, username, password,role,user_profile) VALUES ($1, $2, $3,$4,$5) RETURNING *";
+
+    const values = [
+      email,
+      username,
+      hashedPassword,
+      "nisit",
+      "https://i.pinimg.com/1200x/2c/47/d5/2c47d5dd5b532f83bb55c4cd6f5bd1ef.jpg",
+    ];
     const newUser = await db.query(query, values);
 
     // ส่งผลลัพธ์กลับไปยังผู้ใช้
@@ -203,11 +210,21 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
 
+    const createdAt = new Date(user.created_at);
+    const thaiYear = createdAt.getFullYear() + 543; // เพิ่ม 543 ปีเพื่อให้เป็นปีพ.ศ.
+    const formattedDate = `${("0" + createdAt.getDate()).slice(-2)}/${(
+      "0" +
+      (createdAt.getMonth() + 1)
+    ).slice(-2)}/${thaiYear}`;
+
     const token = jwt.sign(
       {
-        id: user.id,
+        id: user.user_id,
         email: user.email,
         username: user.username,
+        role: user.role,
+        user_profile: user.user_profile,
+        created_at: formattedDate,
       },
       "jwtsecret",
       { expiresIn: "1h" } // กำหนดอายุของโทเค็น
@@ -221,18 +238,19 @@ exports.login = async (req, res) => {
         user_id: user.user_id,
         email: user.email,
         username: user.username,
+        role: user.role,
+        user_profile: user.user_profile,
+        created_at: formattedDate,
       },
     });
 
     console.log("User logged in:", user.username);
   } catch {
     console.error("Error during login:", error);
-    res
-      .status(500)
-      .json({
-        message: "An error occurred during login",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "An error occurred during login",
+      error: error.message,
+    });
   }
 };
 
@@ -289,8 +307,7 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-
-// สถานะของ OTP 
+// สถานะของ OTP
 let otpVerified = false;
 
 exports.verifyOTP = async (req, res) => {

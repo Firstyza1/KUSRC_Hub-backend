@@ -1,16 +1,33 @@
-const express = require('express');
-const cors = require('cors'); // นำเข้า cors
+const express = require("express");
+const cors = require("cors");
+const morgan = require("morgan");
+const bodyParser = require("body-parser");
+const { readdirSync } = require("fs");
+const http = require("http");
+
 const app = express();
-const morgan = require('morgan')
-const bodyParse = require('body-parser')
-app.use(morgan('dev'))
-app.use(cors()); // ตั้งค่า CORS ให้รองรับ request จากทุกโดเมน
-app.use(express.json()); // ใช้ express.json() เพื่อรองรับข้อมูล JSON
+const server = http.createServer(app);
+// const io = require("socket.io")(server, {
+//   cors: {
+//     origin: "*",
+//     methods: ["GET", "POST"],
+//   },
+// });
 
-const { readdirSync } = require('fs');
+// app.set("io", io);
 
-// อ่านไฟล์ทั้งหมดในโฟลเดอร์ Routes และใช้เส้นทาง
-readdirSync('./Routes')
-    .map((r) => app.use(require('./Routes/' + r))); // โหลดเส้นทางแต่ละไฟล์
+app.use(morgan("dev"));
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.listen(3000, () => console.log('Server is Running on port 3000'));
+// io.on("connection", (socket) => {
+//   console.log("user connected");
+//   socket.on("disconnect", () => {
+//     console.log("user disconnected");
+//   });
+// });
+
+readdirSync("./Routes").map((r) => app.use(require("./Routes/" + r)));
+
+server.listen(3000, () => console.log("Server is running on port 3000"));
