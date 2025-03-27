@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { error } = require("console");
 const bcrypt = require("bcryptjs");
+
 exports.userProfile = async (req, res) => {
   try {
     const { user_id } = req.params; // รับ user_id จาก URL parameter
@@ -167,7 +168,7 @@ exports.getAllUsers = async (req, res) => {
   try {
     // คิวรีดึงข้อมูลผู้ใช้ทั้งหมด
     const query = `
-      SELECT user_id, email, username, user_profile, created_at, updated_at 
+      SELECT *
       FROM users
     `;
     const result = await db.query(query);

@@ -1,4 +1,7 @@
 const db = require("../db");
+const cloudinary = require("../cloudinary");
+const fs = require("fs");
+const path = require("path");
 
 exports.requestSubject = async (req, res) => {
   try {
@@ -20,13 +23,38 @@ exports.requestSubject = async (req, res) => {
 
     // ตรวจสอบว่า category_id อยู่ในช่วงที่ถูกต้องหรือไม่
     if (category_id < 0 || category_id > 5) {
-      return res.status(400).json({ message: "Category not found" });
+      return res.status(400).json({ message: "Category not found." });
+    }
+
+    const checSubjectId = await db.query(
+      "SELECT subject_id FROM subject where subject_id  = $1",
+      [subject_id]
+    );
+    if (checSubjectId.rows.length >= 1) {
+      return res.status(401).json({ message: "subject_id is madatory" });
+    }
+
+    const checSubjectThai = await db.query(
+      "SELECT subject_thai FROM subject where subject_thai = $1",
+      [subject_thai]
+    );
+
+    if (checSubjectThai.rows.length >= 1) {
+      return res.status(401).json({ message: "subject_thai is madatory" });
+    }
+
+    const checSubjectTEng = await db.query(
+      "SELECT subject_eng FROM subject where subject_eng = $1",
+      [subject_eng]
+    );
+    if (checSubjectTEng.rows.length >= 1) {
+      return res.status(401).json({ message: "subject_eng is madatory" });
     }
 
     // บันทึกข้อมูลลงในตาราง request
     const insertQuery = `
-      INSERT INTO subject (subject_id, subject_thai, subject_eng, credit, category_id, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO subject (subject_id, subject_thai, subject_eng, credit, category_id, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *`;
     const currentTime = new Date();
     const values = [
@@ -36,12 +64,11 @@ exports.requestSubject = async (req, res) => {
       credit,
       category_id,
       currentTime,
-      currentTime,
     ];
 
     const result = await db.query(insertQuery, values);
 
-    res.status(201).json({
+    res.status(200).json({
       message: "Request submitted successfully",
       request: result.rows[0],
     });
@@ -59,13 +86,21 @@ exports.requestSubject = async (req, res) => {
 exports.getSubject = async (req, res) => {
   try {
     // ดึงข้อมูลทั้งหมดจากตาราง subject
-    const query = `SELECT t1.subject_id, t1.subject_thai, t1.subject_eng, t1.credit, t2.category_name, t1.created_at, t1.updated_at FROM subject t1,category t2 where t1.category_id = t2.category_id`;
+    const query = `SELECT t1.subject_id, t1.subject_thai, t1.subject_eng, t1.credit, t2.category_thai, t1.created_at, t1.updated_at FROM subject t1,category t2 where t1.category_id = t2.category_id`;
     const result = await db.query(query);
 
     // ส่งข้อมูลกลับในรูปแบบ JSON
-    res.status(200).json({
-      subjects: result.rows, // ข้อมูลทั้งหมดในตาราง subject
-    });
+    // res.status(200).json({
+    //   subjects: result.rows,
+    // });
+
+    if (result.rows.length > 0) {
+      res.status(200).json({
+        subjects: result.rows,
+      });
+    } else {
+      res.status(200).json({ subjects: [] });
+    }
   } catch (error) {
     console.error("Error retrieving subjects:", error);
     res.status(500).json({
@@ -111,8 +146,8 @@ exports.deleteSubject = async (req, res) => {
 //   try {
 //     // ✅ ดึงข้อมูลเฉพาะรายวิชาที่ต้องการ
 //     const query = `
-//           SELECT t1.subject_id, t1.subject_thai, t1.subject_eng, t1.credit, 
-//                  t2.category_name, t1.created_at, t1.updated_at 
+//           SELECT t1.subject_id, t1.subject_thai, t1.subject_eng, t1.credit,
+//                  t2.category_name, t1.created_at, t1.updated_at
 //           FROM subject t1
 //           JOIN category t2 ON t1.category_id = t2.category_id
 //           WHERE t1.subject_id = $1;
@@ -238,11 +273,10 @@ exports.deleteReview = async (req, res) => {
   } catch (error) {
     console.error(error.message);
     res.status(500).json({
-      error: `An error occurred while processing your request: ${error.message},`
+      error: `An error occurred while processing your request: ${error.message},`,
     });
   }
 };
-
 
 //เพิ่มของทีน
 exports.getSubjectById = async (req, res) => {
@@ -261,6 +295,7 @@ exports.getSubjectById = async (req, res) => {
         t1.subject_eng,
         t1.credit,
         t2.category_thai,
+        t2.category_id,
         ROUND(AVG((COALESCE(t3.score_homework, 0) / 4.0) * 100), 0) AS percent_homework,
         ROUND(AVG((COALESCE(t3.score_content, 0) / 4.0) * 100), 0) AS percent_content,
         ROUND(AVG((COALESCE(t3.score_teach, 0) / 4.0) * 100), 0) AS percent_teach
@@ -275,7 +310,8 @@ exports.getSubjectById = async (req, res) => {
             t1.subject_thai,
             t1.subject_eng,
             t1.credit,
-            t2.category_thai;`,
+            t2.category_thai,
+            t2.category_id;`,
       [subject_id]
     );
 
@@ -511,6 +547,7 @@ exports.getReview = async (req, res) => {
         t1.score_homework,
         t1.score_content,
         t1.score_teach
+      ORDER BY t1.created_at DESC  
       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
     queryParams.push(limit, offset);
 
@@ -599,43 +636,6 @@ exports.reviewReactions = async (req, res) => {
     console.error(error.message);
     res.status(500).json({
       error: `An error occurred while processing your request: ${error.message}`,
-    });
-  }
-};
-
-exports.getReaction = async (req, res) => {
-  try {
-    const { review_id } = req.params;
-    if (!review_id) {
-      console.log("Error: review_id is required.");
-      return res.status(400).json({ message: "review_id is required." });
-    }
-
-    const result = await db.query(
-      `SELECT 
-          t1.review_id,
-          COUNT(CASE WHEN t2.reaction_type = 'like' THEN 1 END) AS like_count,
-          COUNT(CASE WHEN t2.reaction_type = 'dislike' THEN 1 END) AS dislike_count
-      FROM 
-          review t1
-      LEFT JOIN 
-          review_reaction t2 ON t1.review_id = t2.review_id
-      where t1.review_id = $1
-      GROUP BY 
-          t1.review_id;`,
-      [review_id]
-    );
-
-    if (result.rows.length > 0) {
-      res.status(200).json(result.rows);
-    } else {
-      res.status(404).json({ message: "No data found." });
-    }
-  } catch (error) {
-    console.error(error.message);
-    res.status(500).json({
-      error: "An error occurred while retrieving review ",
-      error: error.message,
     });
   }
 };
@@ -790,6 +790,88 @@ exports.reportReview = async (req, res) => {
     console.error("Error in Report:", error);
     res.status(500).json({
       message: "An error occurred while submitting the post",
+      error: error.message,
+    });
+  }
+};
+
+exports.getSubjectMain = async (req, res) => {
+  try {
+    // ดึงค่าจาก req.query
+    const { page = 1, limit = 10, credit, category_id, search } = req.query;
+    const offset = (page - 1) * limit; // คำนวณ offset สำหรับ pagination
+
+    // แปลง credit และ category_id เป็นอาร์เรย์ (ถ้ามี)
+    const creditArray = credit ? credit.split(",").map(Number) : null;
+    const categoryIdArray = category_id
+      ? category_id.split(",").map(Number)
+      : null;
+
+    // สร้างเงื่อนไขสำหรับ credit และ category_id
+    let creditCondition = "";
+    let categoryCondition = "";
+    let searchCondition = "";
+
+    if (creditArray && creditArray.length > 0) {
+      creditCondition = `AND t1.credit IN (${creditArray.join(",")})`;
+    }
+
+    if (categoryIdArray && categoryIdArray.length > 0) {
+      categoryCondition = `AND t2.category_id IN (${categoryIdArray.join(
+        ","
+      )})`;
+    }
+
+    // สร้างเงื่อนไขสำหรับการค้นหาตามรหัสวิชาและชื่อวิชา
+    if (search) {
+      searchCondition = `
+        AND (
+          t1.subject_id::TEXT ILIKE '%${search}%' OR
+          t1.subject_thai ILIKE '%${search}%' OR
+          t1.subject_eng ILIKE '%${search}%'
+        )
+      `;
+    }
+
+    // สร้าง query เพื่อดึงข้อมูล subject พร้อม pagination และเงื่อนไข
+    const query = `
+      SELECT 
+        t1.subject_id, 
+        t1.subject_thai, 
+        t1.subject_eng, 
+        t1.credit, 
+        t2.category_id,
+        t2.category_thai, 
+        t1.created_at, 
+        t1.updated_at 
+      FROM 
+        subject t1
+      INNER JOIN 
+        category t2 
+      ON 
+        t1.category_id = t2.category_id
+      WHERE 
+        1=1
+        ${creditCondition}
+        ${categoryCondition}
+        ${searchCondition}
+      ORDER BY t1.created_at DESC
+      LIMIT $1 OFFSET $2;
+    `;
+
+    // ส่งค่า limit และ offset ไปกับ query
+    const result = await db.query(query, [limit, offset]);
+
+    // ส่งข้อมูลกลับในรูปแบบ JSON
+    if (result.rows.length > 0) {
+      res.status(200).json(result.rows); // ส่งข้อมูล subjects กลับแบบปกติ
+    } else {
+      res.status(200).json([]); // ส่งอาร์เรย์ว่างกลับหากไม่มีข้อมูล
+    }
+  } catch (error) {
+    console.error("Error retrieving subjects:", error);
+    res.status(500).json({
+      message: "An error occurred while retrieving subjects",
       error: error.message,
     });
   }
