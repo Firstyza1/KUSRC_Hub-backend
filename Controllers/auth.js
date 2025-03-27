@@ -74,24 +74,27 @@ exports.sendOTP = async function (req, res) {
     const otp = generateOTP();
     otpCache[email] = otp;
 
+    const lowerCaseEmail = email.toLowerCase();
+    const lowerCaseUsername = username.toLowerCase();
+
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
     }
 
     const checkEmail = await db.query(
-      "SELECT email FROM users WHERE email = $1",
-      [email]
+      "SELECT email FROM users WHERE LOWER(email) = $1",
+      [lowerCaseEmail]
     );
     const checkUsername = await db.query(
-      "SELECT username FROM users WHERE username = $1",
-      [username]
+      "SELECT username FROM users WHERE LOWER(username) = $1",
+      [lowerCaseUsername]
     );
 
     if (checkEmail.rows.length > 0) {
       return res.status(400).json({ message: "Email already exists" });
     }
     if (checkUsername.rows.length > 0) {
-      return res.status(400).json({ message: "Username already exists" });
+      return res.status(401).json({ message: "Username already exists" });
     }
 
     // เรียกฟังก์ชัน sendEmail พร้อมส่ง otp
@@ -122,6 +125,9 @@ exports.register = async (req, res) => {
   try {
     const { username, email, password, otp } = req.body;
 
+    const lowerCaseEmail = email.toLowerCase();
+    const lowerCaseUsername = username.toLowerCase();
+
     // ตรวจสอบ OTP
     const result = verifyOTP(email, otp, otpCache);
 
@@ -131,12 +137,13 @@ exports.register = async (req, res) => {
 
     // ตรวจสอบว่า email และ username มีอยู่ในฐานข้อมูลหรือไม่
     const checkEmail = await db.query(
-      "SELECT email FROM users WHERE email = $1",
-      [email]
+      "SELECT email FROM users WHERE LOWER(email) = $1",
+      [lowerCaseEmail]
     );
+
     const checkUsername = await db.query(
-      "SELECT username FROM users WHERE username = $1",
-      [username]
+      "SELECT username FROM users WHERE LOWER(username) = $1",
+      [lowerCaseUsername]
     );
 
     if (checkEmail.rows.length > 0) {
@@ -155,10 +162,10 @@ exports.register = async (req, res) => {
       "INSERT INTO users (email, username, password,role,user_profile) VALUES ($1, $2, $3,$4,$5) RETURNING *";
 
     const values = [
-      email,
-      username,
+      lowerCaseEmail,
+      lowerCaseUsername,
       hashedPassword,
-      "nisit",
+      "user",
       "https://i.pinimg.com/1200x/2c/47/d5/2c47d5dd5b532f83bb55c4cd6f5bd1ef.jpg",
     ];
     const newUser = await db.query(query, values);
@@ -188,7 +195,7 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
+    const lowerCaseEmail = email.toLowerCase();
     // ตรวจสอบว่า email และ password ถูกส่งมาหรือไม่
     if (!email || !password) {
       return res
@@ -196,9 +203,10 @@ exports.login = async (req, res) => {
         .json({ message: "Email and password are required" });
     }
     // ค้นหาผู้ใช้จากฐานข้อมูล
-    const userResult = await db.query("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
+    const userResult = await db.query(
+      "SELECT * FROM users WHERE LOWER(email) = $1",
+      [lowerCaseEmail]
+    );
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -224,7 +232,6 @@ exports.login = async (req, res) => {
         username: user.username,
         role: user.role,
         user_profile: user.user_profile,
-        created_at: formattedDate,
       },
       "jwtsecret",
       { expiresIn: "1h" } // กำหนดอายุของโทเค็น
@@ -240,12 +247,12 @@ exports.login = async (req, res) => {
         username: user.username,
         role: user.role,
         user_profile: user.user_profile,
-        created_at: formattedDate,
+        created_at: user.created_at,
       },
     });
 
     console.log("User logged in:", user.username);
-  } catch {
+  } catch (error) {
     console.error("Error during login:", error);
     res.status(500).json({
       message: "An error occurred during login",
@@ -257,16 +264,17 @@ exports.login = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-
+    const lowerCaseEmail = email.toLowerCase();
     // ตรวจสอบว่าได้ส่งอีเมลมาในคำขอหรือไม่
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
     }
 
     // ตรวจสอบว่าผู้ใช้อีเมลนี้มีอยู่ในระบบหรือไม่
-    const userResult = await db.query("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
+    const userResult = await db.query(
+      "SELECT * FROM users WHERE LOWER(email) = $1",
+      [lowerCaseEmail]
+    );
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -308,25 +316,24 @@ exports.forgotPassword = async (req, res) => {
 };
 
 // สถานะของ OTP
-let otpVerified = false;
+const otpSessions = {};
 
 exports.verifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    // ตรวจสอบว่ามีการส่งอีเมลและ OTP หรือไม่
     if (!email || !otp) {
       return res.status(400).json({ message: "Email and OTP are required" });
     }
 
-    // ตรวจสอบว่า OTP ตรงกับข้อมูลที่เก็บไว้หรือไม่
     const result = verifyOTP(email, otp, otpCache);
     if (!result.success) {
       return res.status(result.status).json({ message: result.message });
     }
 
-    // หาก OTP ถูกต้อง ให้ตั้งค่า otpVerified เป็น true
-    otpVerified = true;
+    // เก็บสถานะใน session แทนการใช้ global variable
+    otpSessions[email] = { verified: true, timestamp: Date.now() };
+
     res.status(200).json({ message: "OTP verified successfully" });
   } catch (error) {
     console.error("Error in verifyOTP:", error);
@@ -340,32 +347,32 @@ exports.verifyOTP = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { email, newPassword } = req.body;
-
-    // ตรวจสอบว่า OTP ถูกตรวจสอบหรือยัง
-    if (!otpVerified) {
+    const lowerCaseEmail = email.toLowerCase();
+    // ตรวจสอบ session แทน
+    if (!otpSessions[email]?.verified) {
       return res.status(400).json({ message: "Please verify OTP first" });
     }
 
-    // ตรวจสอบว่ามีการส่งรหัสผ่านใหม่หรือไม่
     if (!newPassword) {
       return res.status(400).json({ message: "New password is required" });
     }
 
-    // แฮชรหัสผ่านใหม่
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    // อัปเดตรหัสผ่านในฐานข้อมูล
     const updateQuery =
       "UPDATE users SET password = $1 WHERE email = $2 RETURNING *";
     const updatedUserResult = await db.query(updateQuery, [
       hashedPassword,
-      email,
+      lowerCaseEmail,
     ]);
 
     if (updatedUserResult.rows.length === 0) {
-      return res.status(500).json({ message: "Failed to reset password" });
+      return res.status(404).json({ message: "User not found" });
     }
+
+    // ลบ session หลังจาก reset password เสร็จสิ้น
+    delete otpSessions[email];
 
     res.status(200).json({
       message: "Password reset successfully",
@@ -374,8 +381,6 @@ exports.resetPassword = async (req, res) => {
         username: updatedUserResult.rows[0].username,
       },
     });
-
-    console.log("Password reset successfully for email:", email);
   } catch (error) {
     console.error("Error in resetPassword:", error);
     res.status(500).json({
