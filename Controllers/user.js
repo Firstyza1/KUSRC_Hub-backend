@@ -7,29 +7,37 @@ const bcrypt = require("bcryptjs");
 
 exports.userProfile = async (req, res) => {
   try {
-    const { user_id } = req.params; // รับ user_id จาก URL parameter
+    const { user_id } = req.params;
+    const userFromToken = req.user;
 
-    // ตรวจสอบว่ามีการส่ง user_id มาหรือไม่
     if (!user_id) {
       return res.status(400).json({ message: "ต้องระบุรหัสผู้ใช้" });
     }
 
-    // ดึงข้อมูลผู้ใช้จากตาราง users
+    if (userFromToken.role !== "admin" && userFromToken.user_id != user_id) {
+      return res.status(403).json({
+        message: "ไม่ได้รับอนุญาตให้เข้าถึงข้อมูลนี้",
+      });
+    }
+
     const query = `
-      SELECT user_id, email, username, user_profile, created_at, updated_at 
+      SELECT user_id, email, username, user_profile, role, created_at, updated_at 
       FROM users 
       WHERE user_id = $1
     `;
     const result = await db.query(query, [user_id]);
 
-    // ตรวจสอบว่าพบข้อมูลหรือไม่
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "ไม่พบผู้ใช้" });
     }
 
-    // ส่งข้อมูลกลับในรูปแบบ JSON
+    // ส่งข้อมูลกลับ
     res.status(200).json({
-      user: result.rows[0], // คืนค่าข้อมูลผู้ใช้
+      user: result.rows[0],
+      accessInfo: {
+        accessedBy: userFromToken.role === "admin" ? "admin" : "owner",
+        requesterId: userFromToken.user_id,
+      },
     });
   } catch (error) {
     console.error("เกิดข้อผิดพลาดในการเรียกข้อมูลโปรไฟล์ผู้ใช้:", error);
@@ -44,23 +52,29 @@ exports.updateUserProfile = async (req, res) => {
   try {
     const { user_id } = req.params;
     const { username } = req.body;
+    const userFromToken = req.user;
 
     if (!user_id) {
       return res.status(400).json({ message: "User ID is required" });
     }
+    const lowerCaseUsername = username.toLowerCase();
 
-    // ตรวจสอบว่า username ซ้ำหรือไม่
+    if (userFromToken.role !== "admin" && userFromToken.user_id != user_id) {
+      fs.unlinkSync(req.file.path);
+      return res.status(403).json({
+        message: "ไม่ได้รับอนุญาตให้แก้ไขข้อมูลนี้",
+      });
+    }
+
     if (username) {
       const usernameCheckQuery = `SELECT username FROM users WHERE username = $1 AND user_id <> $2`;
       const usernameCheckResult = await db.query(usernameCheckQuery, [
-        username,
+        lowerCaseUsername,
         user_id,
       ]);
 
       if (usernameCheckResult.rows.length > 0) {
-        return res
-          .status(400)
-          .json({ message: "ชื่อผู้ใช้นี้มีคนใช้เเล้ว โปรดลองชื่ออื่น" });
+        return res.status(401).json({ message: "ชื่อผู้ใช้ถูกใช้ไปแล้ว" });
       }
     }
 
@@ -109,7 +123,11 @@ exports.updateUserProfile = async (req, res) => {
       RETURNING user_id, username, user_profile, updated_at;
     `;
 
-    const values = [username || null, profileImageUrl || null, user_id];
+    const values = [
+      lowerCaseUsername || null,
+      profileImageUrl || null,
+      user_id,
+    ];
     const updateResult = await db.query(updateQuery, values);
 
     if (updateResult.rowCount === 0) {
@@ -132,36 +150,38 @@ exports.updateUserProfile = async (req, res) => {
 };
 
 exports.deleteUser = async (req, res) => {
-    const { user_id } = req.params; // รับ user_id จาก URL
+  const { user_id } = req.params; // รับ user_id จาก URL
 
-    if(!user_id){
-      return res.status(400).json({error: "ต้องระบุรหัสผู้ใช้"})
+  if (!user_id) {
+    return res.status(400).json({ error: "ต้องระบุรหัสผู้ใช้" });
+  }
+
+  // ตรวจสอบว่า user_id เป็นตัวเลขหรือไม่
+  const parsedUserId = parseInt(user_id, 10);
+  if (isNaN(parsedUserId)) {
+    return res.status(400).json({ error: "user_id ต้องเป็นตัวเลข" });
+  }
+
+  try {
+    // ✅ ตรวจสอบว่าผู้ใช้มีอยู่จริงหรือไม่
+    const checkQuery = "SELECT * FROM users WHERE user_id = $1;";
+    const checkResult = await db.query(checkQuery, [parsedUserId]);
+
+    if (checkResult.rowCount === 0) {
+      return res.status(404).json({ error: "ไม่พบผู้ใช้ที่ต้องการลบ" });
     }
 
-    // ตรวจสอบว่า user_id เป็นตัวเลขหรือไม่
-    const parsedUserId = parseInt(user_id, 10);
-    if (isNaN(parsedUserId)) {
-        return res.status(400).json({ error: "user_id ต้องเป็นตัวเลข" });
-    }
+    // ✅ ลบผู้ใช้
+    const deleteQuery = "DELETE FROM users WHERE user_id = $1 RETURNING *;";
+    const result = await db.query(deleteQuery, [parsedUserId]);
 
-    try {
-        // ✅ ตรวจสอบว่าผู้ใช้มีอยู่จริงหรือไม่
-        const checkQuery = "SELECT * FROM users WHERE user_id = $1;";
-        const checkResult = await db.query(checkQuery, [parsedUserId]);
-
-        if (checkResult.rowCount === 0) {
-            return res.status(404).json({ error: "ไม่พบผู้ใช้ที่ต้องการลบ" });
-        }
-
-        // ✅ ลบผู้ใช้
-        const deleteQuery = "DELETE FROM users WHERE user_id = $1 RETURNING *;";
-        const result = await db.query(deleteQuery, [parsedUserId]);
-
-        res.json({ message: "ลบผู้ใช้สำเร็จ", deletedUser: result.rows[0] });
-    } catch (err) {
-        console.error("เกิดข้อผิดพลาดในการลบผู้ใช้:", err);
-        res.status(500).json({ error: "ไม่สามารถลบผู้ใช้ได้", details: err.message });
-    }
+    res.json({ message: "ลบผู้ใช้สำเร็จ", deletedUser: result.rows[0] });
+  } catch (err) {
+    console.error("เกิดข้อผิดพลาดในการลบผู้ใช้:", err);
+    res
+      .status(500)
+      .json({ error: "ไม่สามารถลบผู้ใช้ได้", details: err.message });
+  }
 };
 
 exports.getAllUsers = async (req, res) => {

@@ -8,13 +8,9 @@ const {
   deleteReportedPost,
   getAllReportedComment,
   deleteReportedComment,
-  // getCountStats,
-  // getUserGrowth,
-  // getSubjectGrowth,
-  // getReviewGrowth,
-  // getPostGrowth,
   getAllPost,
   getAllStats,
+  createSubject,
 } = require("../Controllers/admin");
 const { auth, adminAuth, isOwnerOrAdmin } = require("../Middleware/auth");
 
@@ -40,11 +36,7 @@ router.delete(
   adminAuth,
   deleteReportedComment
 );
-// router.get("/getCountTotal", getCountStats);
-// router.get("/getUserGrowth", getUserGrowth);
-// router.get("/getSubjectGrowth", getSubjectGrowth);
-// router.get("/getReviewGrowth", getReviewGrowth);
-// router.get("/getPostGrowth", getPostGrowth);
 router.get("/getAllPost", getAllPost);
 router.get("/getAllStats", getAllStats);
+router.post("/createSubject", createSubject);
 module.exports = router;

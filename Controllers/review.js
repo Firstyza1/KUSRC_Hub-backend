@@ -261,7 +261,12 @@ exports.deleteReview = async (req, res) => {
     //   });
     // }
 
-    // ลบรีวิว
+    let pdf_file = review.rows[0].pdf_path;
+    if (pdf_file) {
+      const publicId = pdf_file.split("/").pop().split(".")[0]; // ดึงค่าจาก URL ที่ Cloudinary ให้มา
+      await cloudinary.uploader.destroy(`SummaryFile/${publicId}`);
+    }
+
     const result = await db.query(
       "DELETE FROM review WHERE review_id = $1 RETURNING *",
       [review_id]
@@ -278,7 +283,6 @@ exports.deleteReview = async (req, res) => {
   }
 };
 
-//เพิ่มของทีน
 exports.getSubjectById = async (req, res) => {
   try {
     const { subject_id } = req.params;
@@ -290,6 +294,7 @@ exports.getSubjectById = async (req, res) => {
 
     const result = await db.query(
       `SELECT 
+        t1.id,
         t1.subject_id,
         t1.subject_thai,
         t1.subject_eng,
@@ -306,6 +311,7 @@ exports.getSubjectById = async (req, res) => {
         WHERE 
             t1.subject_id = $1
         GROUP BY  
+            t1.id,
             t1.subject_id,
             t1.subject_thai,
             t1.subject_eng,
@@ -876,3 +882,4 @@ exports.getSubjectMain = async (req, res) => {
     });
   }
 };
+

@@ -127,7 +127,7 @@ exports.register = async (req, res) => {
 
     const lowerCaseEmail = email.toLowerCase();
     const lowerCaseUsername = username.toLowerCase();
-
+    const currentTime = new Date();
     // ตรวจสอบ OTP
     const result = verifyOTP(email, otp, otpCache);
 
@@ -159,7 +159,7 @@ exports.register = async (req, res) => {
 
     // เพิ่มผู้ใช้ใหม่ลงในฐานข้อมูล
     const query =
-      "INSERT INTO users (email, username, password,role,user_profile) VALUES ($1, $2, $3,$4,$5) RETURNING *";
+      "INSERT INTO users (email, username, password,role,user_profile,created_at) VALUES ($1, $2, $3,$4,$5,$6) RETURNING *";
 
     const values = [
       lowerCaseEmail,
@@ -167,6 +167,7 @@ exports.register = async (req, res) => {
       hashedPassword,
       "user",
       "https://i.pinimg.com/1200x/2c/47/d5/2c47d5dd5b532f83bb55c4cd6f5bd1ef.jpg",
+      currentTime,
     ];
     const newUser = await db.query(query, values);
 
@@ -227,7 +228,7 @@ exports.login = async (req, res) => {
 
     const token = jwt.sign(
       {
-        id: user.user_id,
+        user_id: user.user_id,
         email: user.email,
         username: user.username,
         role: user.role,

@@ -214,207 +214,10 @@ exports.deleteReportedComment = async (req, res) => {
   }
 };
 
-// exports.getCountStats = async (req, res) => {
-//   try {
-//     // คิวรีนับจำนวนข้อมูลจากแต่ละตาราง
-//     const query = `
-//         SELECT 
-//           (SELECT COUNT(user_id) FROM users) AS total_user,
-//           (SELECT COUNT(subject_id) FROM subject) AS total_subject,
-//           (SELECT COUNT(review_id) FROM review) AS total_review,
-//           (SELECT COUNT(post_id) FROM post) AS total_post,
-//           (SELECT COUNT(report_id) FROM report_review) AS total_reported_review,
-//           (SELECT COUNT(report_id) FROM report_post) AS total_reported_post,
-//           (SELECT COUNT(report_id) FROM report_comment) AS total_reported_comment
-//       `;
-
-//     const result = await db.query(query);
-
-//     // ส่งข้อมูลกลับในรูปแบบ JSON
-//     res.status(200).json({
-//       stats: result.rows[0], // คืนค่าจำนวนข้อมูลทั้งหมด
-//     });
-//   } catch (error) {
-//     console.error("เกิดข้อผิดพลาดในการดึงข้อมูลจำนวน:", error);
-//     res.status(500).json({
-//       message: "เกิดข้อผิดพลาดขณะดึงข้อมูลจำนวน",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// exports.getUserGrowth = async (req, res) => {
-//   try {
-//     // คิวรีนับจำนวนผู้ใช้ในเดือนปัจจุบัน
-//     const currentMonthQuery = `
-//         SELECT COUNT(user_id) AS current_month_users 
-//         FROM users 
-//         WHERE DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE) 
-//         AND DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE);
-//       `;
-
-//     // คิวรีนับจำนวนผู้ใช้ในเดือนที่แล้ว
-//     const lastMonthQuery = `
-//         SELECT COUNT(user_id) AS last_month_users 
-//         FROM users 
-//         WHERE DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE - INTERVAL '1 month') 
-//         AND DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE - INTERVAL '1 month');
-//       `;
-
-//     // ดึงข้อมูลจากฐานข้อมูล
-//     const currentMonthResult = await db.query(currentMonthQuery);
-//     const lastMonthResult = await db.query(lastMonthQuery);
-
-//     // คำนวณจำนวนผู้ใช้ที่เพิ่มขึ้น
-//     const currentUsers = currentMonthResult.rows[0].current_month_users || 0;
-//     const lastUsers = lastMonthResult.rows[0].last_month_users || 0;
-
-//     // ส่งข้อมูลกลับเป็น JSON
-//     res.status(200).json({
-//       last_month_users: lastUsers,
-//       current_month_users: currentUsers,
-//     });
-//   } catch (error) {
-//     console.error(
-//       "เกิดข้อผิดพลาดในการดึงข้อมูลจำนวนผู้ใช้ที่เพิ่มขึ้น:",
-//       error
-//     );
-//     res.status(500).json({
-//       message: "เกิดข้อผิดพลาดขณะดึงข้อมูลจำนวนผู้ใช้ที่เพิ่มขึ้น",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// exports.getSubjectGrowth = async (req, res) => {
-//   try {
-//     // คิวรีนับจำนวน subject ในเดือนปัจจุบัน
-//     const currentMonthQuery = `
-//         SELECT COUNT(subject_id) AS current_month_subjects 
-//         FROM subject 
-//         WHERE DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE) 
-//         AND DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE);
-//       `;
-
-//     // คิวรีนับจำนวน subject ในเดือนที่แล้ว
-//     const lastMonthQuery = `
-//         SELECT COUNT(subject_id) AS last_month_subjects 
-//         FROM subject 
-//         WHERE DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE - INTERVAL '1 month') 
-//         AND DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE - INTERVAL '1 month');
-//       `;
-
-//     // ดึงข้อมูลจากฐานข้อมูล
-//     const currentMonthResult = await db.query(currentMonthQuery);
-//     const lastMonthResult = await db.query(lastMonthQuery);
-
-//     // คำนวณจำนวน subject ที่เพิ่มขึ้น
-//     const currentSubjects =
-//       currentMonthResult.rows[0].current_month_subjects || 0;
-//     const lastSubjects = lastMonthResult.rows[0].last_month_subjects || 0;
-
-//     // ส่งข้อมูลกลับเป็น JSON
-//     res.status(200).json({
-//       last_month_subjects: lastSubjects,
-//       current_month_subjects: currentSubjects,
-//     });
-//   } catch (error) {
-//     console.error(
-//       "เกิดข้อผิดพลาดในการดึงข้อมูลจำนวน subject ที่เพิ่มขึ้น:",
-//       error
-//     );
-//     res.status(500).json({
-//       message: "เกิดข้อผิดพลาดขณะดึงข้อมูลจำนวน subject ที่เพิ่มขึ้น",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// exports.getReviewGrowth = async (req, res) => {
-//   try {
-//     // คิวรีนับจำนวนรีวิวในเดือนปัจจุบัน
-//     const currentMonthQuery = `
-//       SELECT COUNT(review_id) AS current_month_reviews 
-//       FROM review 
-//       WHERE DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE) 
-//       AND DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE);
-//     `;
-
-//     // คิวรีนับจำนวนรีวิวในเดือนที่แล้ว
-//     const lastMonthQuery = `
-//       SELECT COUNT(review_id) AS last_month_reviews 
-//       FROM review 
-//       WHERE DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE - INTERVAL '1 month') 
-//       AND DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE - INTERVAL '1 month');
-//     `;
-
-//     // ดึงข้อมูลจากฐานข้อมูล
-//     const currentMonthResult = await db.query(currentMonthQuery);
-//     const lastMonthResult = await db.query(lastMonthQuery);
-
-//     // คำนวณจำนวนรีวิวที่เพิ่มขึ้น
-//     const currentReviews =
-//       currentMonthResult.rows[0].current_month_reviews || 0;
-//     const lastReviews = lastMonthResult.rows[0].last_month_reviews || 0;
-
-//     // ส่งข้อมูลกลับเป็น JSON
-//     res.status(200).json({
-//       last_month_reviews: lastReviews,
-//       current_month_reviews: currentReviews,
-//     });
-//   } catch (error) {
-//     console.error("เกิดข้อผิดพลาดในการดึงข้อมูลจำนวนรีวิวที่เพิ่มขึ้น:", error);
-//     res.status(500).json({
-//       message: "เกิดข้อผิดพลาดขณะดึงข้อมูลจำนวนรีวิวที่เพิ่มขึ้น",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// exports.getPostGrowth = async (req, res) => {
-//   try {
-//     // คิวรีนับจำนวนโพสต์ในเดือนปัจจุบัน
-//     const currentMonthQuery = `
-//       SELECT COUNT(post_id) AS current_month_posts 
-//       FROM post 
-//       WHERE DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE) 
-//       AND DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE);
-//     `;
-
-//     // คิวรีนับจำนวนโพสต์ในเดือนที่แล้ว
-//     const lastMonthQuery = `
-//       SELECT COUNT(post_id) AS last_month_posts 
-//       FROM post 
-//       WHERE DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE - INTERVAL '1 month') 
-//       AND DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE - INTERVAL '1 month');
-//     `;
-
-//     // ดึงข้อมูลจากฐานข้อมูล
-//     const currentMonthResult = await db.query(currentMonthQuery);
-//     const lastMonthResult = await db.query(lastMonthQuery);
-
-//     // คำนวณจำนวนโพสต์ที่เพิ่มขึ้น
-//     const currentPosts = currentMonthResult.rows[0].current_month_posts || 0;
-//     const lastPosts = lastMonthResult.rows[0].last_month_posts || 0;
-
-//     // ส่งข้อมูลกลับเป็น JSON
-//     res.status(200).json({
-//       last_month_posts: lastPosts,
-//       current_month_posts: currentPosts,
-//     });
-//   } catch (error) {
-//     console.error("เกิดข้อผิดพลาดในการดึงข้อมูลจำนวนโพสต์ที่เพิ่มขึ้น:", error);
-//     res.status(500).json({
-//       message: "เกิดข้อผิดพลาดขณะดึงข้อมูลจำนวนโพสต์ที่เพิ่มขึ้น",
-//       error: error.message,
-//     });
-//   }
-// };
-
 exports.getAllStats = async (req, res) => {
   try {
-      // คิวรีนับจำนวนข้อมูลจากแต่ละตาราง
-      const query = `
+    // คิวรีนับจำนวนข้อมูลจากแต่ละตาราง
+    const query = `
           SELECT 
               (SELECT COUNT(user_id) FROM users) AS total_users,
               (SELECT COUNT(subject_id) FROM subject) AS total_subjects,
@@ -424,9 +227,9 @@ exports.getAllStats = async (req, res) => {
               (SELECT COUNT(report_id) FROM report_post) AS total_reported_posts,
               (SELECT COUNT(report_id) FROM report_comment) AS total_reported_comments
       `;
-      
-      // คิวรีนับจำนวนข้อมูลที่เพิ่มขึ้นในเดือนปัจจุบันและเดือนที่แล้ว
-      const growthQuery = `
+
+    // คิวรีนับจำนวนข้อมูลที่เพิ่มขึ้นในเดือนปัจจุบันและเดือนที่แล้ว
+    const growthQuery = `
           SELECT 'users' AS type, COUNT(user_id) AS current, 
               (SELECT COUNT(user_id) FROM users 
                WHERE DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE - INTERVAL '1 month')
@@ -453,28 +256,28 @@ exports.getAllStats = async (req, res) => {
                 AND DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE);
       `;
 
-      const statsResult = await db.query(query);
-      const growthResult = await db.query(growthQuery);
+    const statsResult = await db.query(query);
+    const growthResult = await db.query(growthQuery);
 
-      // จัดรูปแบบข้อมูลที่ส่งกลับ
-      const growthData = {};
-      growthResult.rows.forEach(row => {
-          growthData[row.type] = {
-              current_month: row.current || 0,
-              last_month: row.last || 0
-          };
-      });
+    // จัดรูปแบบข้อมูลที่ส่งกลับ
+    const growthData = {};
+    growthResult.rows.forEach((row) => {
+      growthData[row.type] = {
+        current_month: row.current || 0,
+        last_month: row.last || 0,
+      };
+    });
 
-      res.status(200).json({
-          stats: statsResult.rows[0],
-          growth: growthData
-      });
+    res.status(200).json({
+      stats: statsResult.rows[0],
+      growth: growthData,
+    });
   } catch (error) {
-      console.error("เกิดข้อผิดพลาดในการดึงข้อมูลจำนวน:", error);
-      res.status(500).json({
-          message: "เกิดข้อผิดพลาดขณะดึงข้อมูลจำนวน",
-          error: error.message,
-      });
+    console.error("เกิดข้อผิดพลาดในการดึงข้อมูลจำนวน:", error);
+    res.status(500).json({
+      message: "เกิดข้อผิดพลาดขณะดึงข้อมูลจำนวน",
+      error: error.message,
+    });
   }
 };
 
@@ -518,6 +321,147 @@ exports.getAllPost = async (req, res) => {
     res.status(500).json({
       error: "An error occurred while retrieving post",
       message: error.message,
+    });
+  }
+};
+
+exports.createSubject = async (req, res) => {
+  try {
+    const { id, subject_id, subject_thai, subject_eng, credit, category_id } =
+      req.body;
+
+    if (
+      !subject_id ||
+      !subject_thai ||
+      !subject_eng ||
+      !credit ||
+      !category_id
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Please fill out the information completely." });
+    }
+
+    if (category_id < 0 || category_id > 5) {
+      return res.status(400).json({ message: "Category not found." });
+    }
+
+    const existingSubject = await db.query(
+      "SELECT * FROM subject WHERE id = $1",
+      [id]
+    );
+
+    let query;
+    let values;
+    let action;
+    const currentTime = new Date();
+
+    if (existingSubject.rows.length > 0) {
+      const checkDuplicateSubjectId = await db.query(
+        "SELECT subject_id FROM subject WHERE subject_id = $1  AND id != $2",
+        [subject_id, id]
+      );
+
+      if (checkDuplicateSubjectId.rows.length > 0) {
+        return res.status(400).json({ message: "subject_id already exists" });
+      }
+
+      const checkDuplicateThai = await db.query(
+        "SELECT subject_id FROM subject WHERE subject_thai = $1 AND id != $2",
+        [subject_thai, id]
+      );
+
+      if (checkDuplicateThai.rows.length > 0) {
+        return res.status(400).json({ message: "subject_thai already exists" });
+      }
+
+      const checkDuplicateEng = await db.query(
+        "SELECT subject_id FROM subject WHERE subject_eng = $1 AND id != $2",
+        [subject_eng, id]
+      );
+
+      if (checkDuplicateEng.rows.length > 0) {
+        return res.status(400).json({ message: "subject_eng already exists" });
+      }
+
+      query = `
+        UPDATE subject 
+        SET subject_id = $1,
+            subject_thai = $2, 
+            subject_eng = $3, 
+            credit = $4, 
+            category_id = $5, 
+            updated_at = $6
+        WHERE id = $7
+        RETURNING *`;
+      values = [
+        subject_id,
+        subject_thai,
+        subject_eng,
+        credit,
+        category_id,
+        currentTime,
+        id,
+      ];
+      action = "updated";
+    } else {
+      const checkDuplicateSubjectId = await db.query(
+        "SELECT subject_id FROM subject WHERE subject_id = $1",
+        [subject_id]
+      );
+
+      if (checkDuplicateSubjectId.rows.length > 0) {
+        return res.status(400).json({ message: "subject_id already exists" });
+      }
+
+      const checkDuplicateThai = await db.query(
+        "SELECT subject_id FROM subject WHERE subject_thai = $1",
+        [subject_thai]
+      );
+
+      if (checkDuplicateThai.rows.length > 0) {
+        return res.status(400).json({ message: "subject_thai already exists" });
+      }
+
+      const checkDuplicateEng = await db.query(
+        "SELECT subject_id FROM subject WHERE subject_eng = $1",
+        [subject_eng]
+      );
+
+      if (checkDuplicateEng.rows.length > 0) {
+        return res.status(400).json({ message: "subject_eng already exists" });
+      }
+
+      query = `
+        INSERT INTO subject (subject_id, subject_thai, subject_eng, credit, category_id, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *`;
+      values = [
+        subject_id,
+        subject_thai,
+        subject_eng,
+        credit,
+        category_id,
+        currentTime,
+      ];
+      action = "created";
+    }
+    const result = await db.query(query, values);
+
+    // Return 201 for create, 200 for update
+    const statusCode = action === "created" ? 201 : 200;
+
+    res.status(statusCode).json({
+      message: `Subject ${action} successfully`,
+      subject: result.rows[0],
+    });
+
+    console.log(`Subject ${action}:`, result.rows[0]);
+  } catch (error) {
+    console.error("Error in requestSubject:", error);
+    res.status(500).json({
+      message: "An error occurred while processing the subject",
+      error: error.message,
     });
   }
 };

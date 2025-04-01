@@ -223,6 +223,7 @@ exports.getPost = async (req, res) => {
     });
   }
 };
+
 // exports.getPostById = async (req, res) => {
 //     const { post_id } = req.params; // รับ post_id จาก URL
 
@@ -256,6 +257,7 @@ exports.getPost = async (req, res) => {
 //         res.status(500).json({ error: "ไม่สามารถดึงโพสต์ได้", details: error.message });
 //     }
 // };
+
 exports.reportPost = async (req, res) => {
   try {
     const { user_id, report_desc } = req.body;
